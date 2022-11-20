@@ -13,29 +13,73 @@
     factory(window.L);
   }
 }(function (L) {
-  L.EdgeBuffer = {
-    previousMethods: {
-      getTiledPixelBounds: L.GridLayer.prototype._getTiledPixelBounds
+    L.EdgeBuffer = {
+        _shouldExtend: true,
+        _isBusy: false,
+        previousMethods: {
+            getTiledPixelBounds: L.GridLayer.prototype._getTiledPixelBounds
+        }
+    };
+ 
+    L.GridLayer.include({
+        _getTiledPixelBounds : function(center, zoom, tileZoom) {
+        var pixelBounds = L.EdgeBuffer.previousMethods.getTiledPixelBounds.call(this, center, zoom, tileZoom);
+        if (L.EdgeBuffer._shouldExtend && !L.EdgeBuffer._isBusy) {
+
+            const edgeBufferTiles = this.options.edgeBufferTiles || 0;
+
+            if (edgeBufferTiles > 0) {
+                // console.log('using edgebuffer');
+
+                var pixelEdgeBuffer = L.GridLayer.prototype.getTileSize.call(this).multiplyBy(edgeBufferTiles);
+                pixelBounds =
+                    new L.Bounds(pixelBounds.min.subtract(pixelEdgeBuffer), pixelBounds.max.add(pixelEdgeBuffer));
+            }
+        } else {
+        //       console.log('skipping edgebuffer');
+        }
+        return pixelBounds;
     }
-  };
+    });
 
-  L.GridLayer.include({
+    L.EdgeBufferHandler = L.Handler.extend({
+        _self: this,
 
-    _getTiledPixelBounds : function(center, zoom, tileZoom) {
-      var pixelBounds = L.EdgeBuffer.previousMethods.getTiledPixelBounds.call(this, center, zoom, tileZoom);
-
-      // Default is to buffer one tiles beyond the pixel bounds (edgeBufferTiles = 1).
-      var edgeBufferTiles = 1;
-      if ((this.options.edgeBufferTiles !== undefined) && (this.options.edgeBufferTiles !== null)) {
-        edgeBufferTiles = this.options.edgeBufferTiles;
-      }
-
-      if (edgeBufferTiles > 0) {
-        var pixelEdgeBuffer = L.GridLayer.prototype.getTileSize.call(this).multiplyBy(edgeBufferTiles);
-        pixelBounds = new L.Bounds(pixelBounds.min.subtract(pixelEdgeBuffer), pixelBounds.max.add(pixelEdgeBuffer));
-      }
-      return pixelBounds;
+        _onZoomStart: function () {
+            L.EdgeBuffer._isBusy = true;
+        },
+        _onZoomEnd: function () {
+            L.EdgeBuffer._isBusy = false;
+        },
+        _onMoveStart: function () {
+            L.EdgeBuffer._shouldExtend = true;
+        },
+        _onMoveEnd: function () {
+            L.EdgeBuffer._shouldExtend = false;
+        },
+        initialize: function (map, options) {
+            this._map = map;
+        },
+        addHooks: function () {
+            if (this._map) {
+                this._map.on('zoomstart', this._onZoomStart);
+                this._map.on('zoomend', this._onZoomEnd);
+                this._map.on('movestart', this._onMoveStart);
+                this._map.on('moveend', this._onMoveEnd);
+            }
+        },
+        removeHooks: function () {
+            if (this._map) {
+                this._map.off('zoomstart', this._onZoomStart);
+                this._map.off('zoomend', this._onZoomEnd);
+                this._map.off('movestart', this._onMoveStart);
+                this._map.off('moveend', this._onMoveEnd);
+            }
+        }
+    });
+    L.edgeBufferHandler = function (opts) {
+        return new L.EdgeBufferHandler(opts);
     }
-  });
+    L.Map.addInitHook('addHandler', 'edgeBufferHandler', L.EdgeBufferHandler);
 
 }, window));
