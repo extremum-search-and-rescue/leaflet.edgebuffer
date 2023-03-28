@@ -21,7 +21,7 @@
         }
     };
  
-    L.GridLayer.include({
+    L.TileLayer.include({
         _getTiledPixelBounds : function(center, zoom, tileZoom) {
         var pixelBounds = L.EdgeBuffer.previousMethods.getTiledPixelBounds.call(this, center, zoom, tileZoom);
         if (L.EdgeBuffer._shouldExtend && !L.EdgeBuffer._isBusy) {
@@ -80,6 +80,6 @@
     L.edgeBufferHandler = function (opts) {
         return new L.EdgeBufferHandler(opts);
     }
-    L.Map.addInitHook('addHandler', 'edgeBufferHandler', L.EdgeBufferHandler);
+    L.Map.addInitHook('addHandler', 'edgeBufferHandler', L.edgeBufferHandler);
 
 }, window));
